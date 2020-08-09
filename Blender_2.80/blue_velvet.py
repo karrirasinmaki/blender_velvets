@@ -81,7 +81,7 @@ def toSamples(fr, ar, fps):
     return int(fr * ar / fps)
 
 
-def getAudioTimeline(ar, fps):
+def getAudioTimeline(ar, fps, scene=None, startFrame=0):
     '''Retrieves all relevant audio information from scene's timeline'''
     timelineSources = []
     timelineRepeated = []
@@ -91,7 +91,20 @@ def getAudioTimeline(ar, fps):
     path = bpy.path
     validExts = list(path.extensions_audio) + list(path.extensions_movie)
 
-    for i in bpy.context.sequences:
+    if scene is None:
+        scene = bpy.context.scene
+
+    for i in scene.sequence_editor.sequences_all.values():
+        if (i.type == "SCENE" and i.scene_input == "SEQUENCER"):
+            if (i.mute == True):
+                continue
+            b_timelineSources, b_timelineRepeated, b_tracks, b_idCounter = getAudioTimeline(ar, fps, i.scene, i.frame_start)
+            timelineSources.extend(b_timelineSources)
+            timelineRepeated.extend(b_timelineRepeated)
+            tracks.extend(b_tracks)
+            idCounter = idCounter + b_idCounter
+            continue
+
         # Movies with audio such as MOV (h264 + mp3) are read by Blender as:
         # movie_strip.mov (type=='SOUND') and movie_strip.001 (type=='VIDEO').
         # If there is a movie strip with no audio, it will be read as:
@@ -99,7 +112,7 @@ def getAudioTimeline(ar, fps):
         if (i.type == "SOUND"):
             start = i.frame_offset_start
             start = toSamples(start, ar, fps)
-            position = i.frame_start + i.frame_offset_start - 1
+            position = i.frame_start + i.frame_offset_start - 1 + startFrame
             position = toSamples(position, ar, fps)
             length = i.frame_final_end - (i.frame_start + i.frame_offset_start)
             length = toSamples(length, ar, fps)
